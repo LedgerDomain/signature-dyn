@@ -1,0 +1,113 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "check signature-dyn",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "check",
+                "--all-features",
+                "--tests"
+            ],
+            "group": "build",
+            "options": {
+                "env": {}
+            },
+            "presentation": {
+                "clear": true,
+                "revealProblems": "onProblem"
+            },
+            "problemMatcher": [
+                {
+                    "base": "$rustc",
+                    "fileLocation": [
+                        "relative"
+                    ]
+                }
+            ]
+        },
+        {
+            "label": "test signature-dyn",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "test",
+                "--all-features",
+                "--tests"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "env": {}
+            },
+            "presentation": {
+                "clear": true,
+                "revealProblems": "onProblem"
+            },
+            "problemMatcher": [
+                {
+                    "base": "$rustc",
+                    "fileLocation": [
+                        "relative"
+                    ]
+                }
+            ]
+        },
+        {
+            "label": "doc signature-dyn",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "doc",
+                "--package",
+                "signature-dyn",
+                "--all-features"
+            ],
+            "group": "build",
+            "options": {
+                "env": {}
+            },
+            "presentation": {
+                "clear": true,
+                "revealProblems": "onProblem"
+            },
+            "problemMatcher": [
+                {
+                    "base": "$rustc",
+                    "fileLocation": [
+                        "relative"
+                    ]
+                }
+            ]
+        },
+        {
+            "label": "doc workspace",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "doc",
+                "--workspace",
+                "--all-features"
+            ],
+            "group": "build",
+            "options": {
+                "env": {}
+            },
+            "presentation": {
+                "clear": true,
+                "revealProblems": "onProblem"
+            },
+            "problemMatcher": [
+                {
+                    "base": "$rustc",
+                    "fileLocation": [
+                        "relative"
+                    ]
+                }
+            ]
+        }
+    ]
+}
