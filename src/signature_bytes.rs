@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     ED448_JOSE_ALGORITHM, ED25519_JOSE_ALGORITHM, P256_JOSE_ALGORITHM, P384_JOSE_ALGORITHM,
-    P521_JOSE_ALGORITHM, Result, SECP256K1_JOSE_ALGORITHM, SignatureDynT, bail,
+    P521_JOSE_ALGORITHM, Result, SECP256K1_JOSE_ALGORITHM, SignatureT, bail,
 };
 
 // TODO: impl Zeroize
@@ -67,11 +67,11 @@ impl<'a> SignatureBytes<'a> {
     }
 }
 
-impl<'a> SignatureDynT for SignatureBytes<'a> {
+impl<'a> SignatureT for SignatureBytes<'a> {
     fn jose_algorithm(&self) -> &'static str {
         self.jose_algorithm
     }
-    fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
+    fn get_raw_bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
         self.byte_v.clone()
     }
     fn to_signature_bytes<'b, 's: 'b>(&'s self) -> SignatureBytes<'b> {

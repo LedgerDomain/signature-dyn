@@ -1,24 +1,23 @@
-#[cfg(feature = "signature")]
 fn test_sign_verify_commutative_diagram_case<Signature, Signer, Verifier>(
     signer: Signer,
     verifier: Verifier,
 ) where
-    Signature: signature_dyn::SignatureDynT,
-    Signer: signature::Signer<Signature> + signature_dyn::SignerDynT,
-    Verifier: signature::Verifier<Signature> + signature_dyn::VerifierDynT,
+    Signature: signature_dyn::SignatureT,
+    Signer:
+        signature::Signer<Signature> + signature_dyn::ExtractableSignerT + signature_dyn::SignerT,
+    Verifier: signature::Verifier<Signature> + signature_dyn::VerifierT,
 {
-    use signature_dyn::{SignerDynT, VerifierDynT};
+    use signature_dyn::{SignerT, VerifierT};
 
     let message = b"HIPPO";
 
-    let verifier_dyn_b = signer.verifier_dyn().expect("pass");
-    let signature: Signature = signer.sign(message);
+    let signature: Signature = signer.try_sign(message).expect("pass");
     verifier.verify(message, &signature).expect("pass");
     let expected_signature_bytes = signature.to_signature_bytes();
 
-    let signer_bytes = signer.to_signer_bytes();
+    let signer_bytes = signer.extract_signer_bytes().expect("pass");
     let verifier_bytes = verifier.to_verifier_bytes();
-    let signature_b = signer_bytes.sign_message(message);
+    let signature_b = signer_bytes.try_sign_message(message).expect("pass");
     verifier_bytes
         .verify_message(message, signature_b.as_ref())
         .expect("pass");
@@ -30,24 +29,22 @@ fn test_sign_verify_commutative_diagram_case<Signature, Signer, Verifier>(
     );
     println!("signature_bytes: {:?}", signature_bytes);
     println!("expected_signature_bytes: {:?}", expected_signature_bytes);
-
     assert_eq!(signature_bytes, expected_signature_bytes);
-    assert_eq!(
-        verifier_dyn_b.to_verifier_bytes(),
-        verifier.to_verifier_bytes()
-    );
-    assert_eq!(verifier_dyn_b.to_verifier_bytes(), verifier_bytes);
 }
 
-fn test_sign_verify_commutative_diagram_case_signature_3<Signature, Signer, Verifier>(
+#[cfg(feature = "async")]
+#[cfg(feature = "signature")]
+async fn test_sign_verify_commutative_diagram_case_async<Signature, Signer, Verifier>(
     signer: Signer,
     verifier: Verifier,
 ) where
-    Signature: signature_dyn::SignatureDynT,
-    Signer: signature_3::Signer<Signature> + signature_dyn::SignerDynT,
-    Verifier: signature_3::Verifier<Signature> + signature_dyn::VerifierDynT,
+    Signature: signature_dyn::SignatureT,
+    Signer: signature::Signer<Signature>
+        + signature_dyn::ExtractableSignerT
+        + signature_dyn::AsyncSignerT,
+    Verifier: signature::Verifier<Signature> + signature_dyn::VerifierT,
 {
-    use signature_dyn::{SignerDynT, VerifierDynT};
+    use signature_dyn::{SignerT, VerifierT};
 
     let message = b"HIPPO";
 
@@ -55,9 +52,9 @@ fn test_sign_verify_commutative_diagram_case_signature_3<Signature, Signer, Veri
     verifier.verify(message, &signature).expect("pass");
     let expected_signature_bytes = signature.to_signature_bytes();
 
-    let signer_bytes = signer.to_signer_bytes();
+    let signer_bytes = signer.extract_signer_bytes().expect("pass");
     let verifier_bytes = verifier.to_verifier_bytes();
-    let signature_b = signer_bytes.sign_message(message);
+    let signature_b = signer_bytes.try_sign_message(message).expect("pass");
     verifier_bytes
         .verify_message(message, signature_b.as_ref())
         .expect("pass");
@@ -75,7 +72,8 @@ fn test_sign_verify_commutative_diagram_case_signature_3<Signature, Signer, Veri
 #[cfg(feature = "ed25519-dalek")]
 #[test]
 fn test_ed25519_dalek() {
-    let signing_key = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let mut rng = rand::rand_core::UnwrapErr(rand::rngs::SysRng);
+    let signing_key = ed25519_dalek::SigningKey::generate(&mut rng);
     let verifying_key = signing_key.verifying_key();
     test_sign_verify_commutative_diagram_case(signing_key, verifying_key);
 }
@@ -92,11 +90,10 @@ fn test_ed25519_dalek_generate_random() {
 #[cfg(feature = "ed448-goldilocks")]
 #[test]
 fn test_ed448_goldilocks() {
-    let signing_key = ed448_goldilocks::SigningKey::generate(&mut rand_0_9::rand_core::UnwrapMut(
-        &mut rand_0_9::rngs::OsRng,
-    ));
+    use ed448_goldilocks::elliptic_curve::Generate;
+    let signing_key = ed448_goldilocks::SigningKey::generate();
     let verifying_key = signing_key.verifying_key();
-    test_sign_verify_commutative_diagram_case_signature_3(signing_key, verifying_key);
+    test_sign_verify_commutative_diagram_case(signing_key, verifying_key);
 }
 
 #[cfg(all(feature = "ed448-goldilocks", feature = "random"))]
@@ -105,13 +102,14 @@ fn test_ed448_goldilocks_generate_random() {
     use signature_dyn::GenerateRandom;
     let signing_key = ed448_goldilocks::SigningKey::generate_random();
     let verifying_key = signing_key.verifying_key();
-    test_sign_verify_commutative_diagram_case_signature_3(signing_key, verifying_key);
+    test_sign_verify_commutative_diagram_case(signing_key, verifying_key);
 }
 
 #[cfg(feature = "k256")]
 #[test]
 fn test_k256() {
-    let signing_key = k256::ecdsa::SigningKey::random(&mut rand::rngs::OsRng);
+    use k256::elliptic_curve::Generate;
+    let signing_key = k256::ecdsa::SigningKey::generate();
     let verifying_key = signing_key.verifying_key().clone();
     test_sign_verify_commutative_diagram_case::<k256::ecdsa::Signature, _, _>(
         signing_key,
@@ -134,7 +132,8 @@ fn test_k256_generate_random() {
 #[cfg(feature = "p256")]
 #[test]
 fn test_p256() {
-    let signing_key = p256::ecdsa::SigningKey::random(&mut rand::rngs::OsRng);
+    use p256::elliptic_curve::Generate;
+    let signing_key = p256::ecdsa::SigningKey::generate();
     let verifying_key = signing_key.verifying_key().clone();
     test_sign_verify_commutative_diagram_case::<p256::ecdsa::Signature, _, _>(
         signing_key,
@@ -157,7 +156,8 @@ fn test_p256_generate_random() {
 #[cfg(feature = "p384")]
 #[test]
 fn test_p384() {
-    let signing_key = p384::ecdsa::SigningKey::random(&mut rand::rngs::OsRng);
+    use p384::elliptic_curve::Generate;
+    let signing_key = p384::ecdsa::SigningKey::generate();
     let verifying_key = signing_key.verifying_key().clone();
     test_sign_verify_commutative_diagram_case::<p384::ecdsa::Signature, _, _>(
         signing_key,
@@ -180,11 +180,10 @@ fn test_p384_generate_random() {
 #[cfg(feature = "p521")]
 #[test]
 fn test_p521() {
-    let signing_key = p521::ecdsa::SigningKey::random(&mut rand_0_9::rand_core::UnwrapMut(
-        &mut rand_0_9::rngs::OsRng,
-    ));
+    use p521::elliptic_curve::Generate;
+    let signing_key = p521::ecdsa::SigningKey::generate();
     let verifying_key = signing_key.verifying_key().clone();
-    test_sign_verify_commutative_diagram_case_signature_3::<p521::ecdsa::Signature, _, _>(
+    test_sign_verify_commutative_diagram_case::<p521::ecdsa::Signature, _, _>(
         signing_key,
         verifying_key,
     );
@@ -196,18 +195,158 @@ fn test_p521_generate_random() {
     use signature_dyn::GenerateRandom;
     let signing_key = p521::ecdsa::SigningKey::generate_random();
     let verifying_key = signing_key.verifying_key().clone();
-    test_sign_verify_commutative_diagram_case_signature_3::<p521::ecdsa::Signature, _, _>(
+    test_sign_verify_commutative_diagram_case::<p521::ecdsa::Signature, _, _>(
         signing_key,
         verifying_key,
     );
+}
+
+#[cfg(all(feature = "async", feature = "ed25519-dalek"))]
+#[tokio::test]
+async fn test_ed25519_dalek_async() {
+    let mut rng = rand::rand_core::UnwrapErr(rand::rngs::SysRng);
+    let signing_key = ed25519_dalek::SigningKey::generate(&mut rng);
+    let verifying_key = signing_key.verifying_key();
+    test_sign_verify_commutative_diagram_case_async(signing_key, verifying_key).await;
+}
+
+#[cfg(all(feature = "async", feature = "ed25519-dalek", feature = "random"))]
+#[tokio::test]
+async fn test_ed25519_dalek_generate_random_async() {
+    use signature_dyn::GenerateRandom;
+    let signing_key = ed25519_dalek::SigningKey::generate_random();
+    let verifying_key = signing_key.verifying_key();
+    test_sign_verify_commutative_diagram_case_async(signing_key, verifying_key).await;
+}
+
+#[cfg(all(feature = "async", feature = "ed448-goldilocks"))]
+#[tokio::test]
+async fn test_ed448_goldilocks_async() {
+    use ed448_goldilocks::elliptic_curve::Generate;
+    let signing_key = ed448_goldilocks::SigningKey::generate();
+    let verifying_key = signing_key.verifying_key();
+    test_sign_verify_commutative_diagram_case_async(signing_key, verifying_key).await;
+}
+
+#[cfg(all(feature = "async", feature = "ed448-goldilocks", feature = "random"))]
+#[tokio::test]
+async fn test_ed448_goldilocks_generate_random_async() {
+    use signature_dyn::GenerateRandom;
+    let signing_key = ed448_goldilocks::SigningKey::generate_random();
+    let verifying_key = signing_key.verifying_key();
+    test_sign_verify_commutative_diagram_case_async(signing_key, verifying_key).await;
+}
+
+#[cfg(all(feature = "async", feature = "k256"))]
+#[tokio::test]
+async fn test_k256_async() {
+    use k256::elliptic_curve::Generate;
+    let signing_key = k256::ecdsa::SigningKey::generate();
+    let verifying_key = signing_key.verifying_key().clone();
+    test_sign_verify_commutative_diagram_case_async::<k256::ecdsa::Signature, _, _>(
+        signing_key,
+        verifying_key,
+    )
+    .await;
+}
+
+#[cfg(all(feature = "async", feature = "k256", feature = "random"))]
+#[tokio::test]
+async fn test_k256_generate_random_async() {
+    use signature_dyn::GenerateRandom;
+    let signing_key = k256::ecdsa::SigningKey::generate_random();
+    let verifying_key = signing_key.verifying_key().clone();
+    test_sign_verify_commutative_diagram_case_async::<k256::ecdsa::Signature, _, _>(
+        signing_key,
+        verifying_key,
+    )
+    .await;
+}
+
+#[cfg(all(feature = "async", feature = "p256"))]
+#[tokio::test]
+async fn test_p256_async() {
+    use p256::elliptic_curve::Generate;
+    let signing_key = p256::ecdsa::SigningKey::generate();
+    let verifying_key = signing_key.verifying_key().clone();
+    test_sign_verify_commutative_diagram_case_async::<p256::ecdsa::Signature, _, _>(
+        signing_key,
+        verifying_key,
+    )
+    .await;
+}
+
+#[cfg(all(feature = "async", feature = "p256", feature = "random"))]
+#[tokio::test]
+async fn test_p256_generate_random_async() {
+    use signature_dyn::GenerateRandom;
+    let signing_key = p256::ecdsa::SigningKey::generate_random();
+    let verifying_key = signing_key.verifying_key().clone();
+    test_sign_verify_commutative_diagram_case_async::<p256::ecdsa::Signature, _, _>(
+        signing_key,
+        verifying_key,
+    )
+    .await;
+}
+
+#[cfg(all(feature = "async", feature = "p384"))]
+#[tokio::test]
+async fn test_p384_async() {
+    use p384::elliptic_curve::Generate;
+    let signing_key = p384::ecdsa::SigningKey::generate();
+    let verifying_key = signing_key.verifying_key().clone();
+    test_sign_verify_commutative_diagram_case_async::<p384::ecdsa::Signature, _, _>(
+        signing_key,
+        verifying_key,
+    )
+    .await;
+}
+
+#[cfg(all(feature = "async", feature = "p384", feature = "random"))]
+#[tokio::test]
+async fn test_p384_generate_random_async() {
+    use signature_dyn::GenerateRandom;
+    let signing_key = p384::ecdsa::SigningKey::generate_random();
+    let verifying_key = signing_key.verifying_key().clone();
+    test_sign_verify_commutative_diagram_case_async::<p384::ecdsa::Signature, _, _>(
+        signing_key,
+        verifying_key,
+    )
+    .await;
+}
+
+#[cfg(all(feature = "async", feature = "p521"))]
+#[tokio::test]
+async fn test_p521_async() {
+    use p521::elliptic_curve::Generate;
+    let signing_key = p521::ecdsa::SigningKey::generate();
+    let verifying_key = signing_key.verifying_key().clone();
+    test_sign_verify_commutative_diagram_case_async::<p521::ecdsa::Signature, _, _>(
+        signing_key,
+        verifying_key,
+    )
+    .await;
+}
+
+#[cfg(all(feature = "async", feature = "p521", feature = "random"))]
+#[tokio::test]
+async fn test_p521_generate_random_async() {
+    use signature_dyn::GenerateRandom;
+    let signing_key = p521::ecdsa::SigningKey::generate_random();
+    let verifying_key = signing_key.verifying_key().clone();
+    test_sign_verify_commutative_diagram_case_async::<p521::ecdsa::Signature, _, _>(
+        signing_key,
+        verifying_key,
+    )
+    .await;
 }
 
 #[cfg(feature = "random")]
 fn test_generate_random_impl(key_type: signature_dyn::KeyType) {
     let message = b"HIPPO";
     let signer_b = key_type.generate_random_private_key();
-    let signature_b = signer_b.sign_message(message);
-    let verifier_b = signer_b.verifier_dyn().expect("pass");
+    let signature_b = signer_b.try_sign_message(message).expect("pass");
+    let verifier_b = signer_b.get_verifier().expect("pass");
     verifier_b
         .verify_message(message, signature_b.as_ref())
         .expect("pass");
@@ -239,26 +378,27 @@ fn test_generate_random() {
 
 #[cfg(feature = "pkcs8")]
 fn test_pkcs8_impl<
-    PrivKey: signature_dyn::PKCS8Write + signature_dyn::PKCS8Read + signature_dyn::SignerDynT,
+    PrivKey: signature_dyn::ExtractableSignerT
+        + signature_dyn::PKCS8Write
+        + signature_dyn::PKCS8Read
+        + signature_dyn::SignerT,
 >(
     key_type: signature_dyn::KeyType,
     priv_key: &PrivKey,
 ) {
     let path = std::path::PathBuf::from(format!("test.{:?}.pem", key_type));
-    // use signature_dyn::PKCS8Write;
     priv_key.write_to_pkcs8_pem_file(&path).expect("pass");
-    // use signature_dyn::PKCS8Read;
     let priv_key_from_disk = PrivKey::read_from_pkcs8_pem_file(&path).expect("pass");
     assert_eq!(
-        priv_key_from_disk.to_signer_bytes(),
-        priv_key.to_signer_bytes()
+        priv_key_from_disk.extract_signer_bytes().expect("pass"),
+        priv_key.extract_signer_bytes().expect("pass")
     );
 }
 
 #[cfg(all(feature = "pkcs8", feature = "random"))]
 #[test]
 fn test_pkcs8() {
-    use signature_dyn::{GenerateRandom, SignerDynT};
+    use signature_dyn::{GenerateRandom, SignerT};
 
     #[cfg(feature = "ed25519-dalek")]
     {

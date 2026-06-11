@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use crate::{
-    KeyType, Result, SignatureBytes, SignatureDynT, SignerBytes, SignerDynT, VerifierBytes,
-    VerifierDynT, ensure, error,
+    ExtractableSignerT, KeyType, Result, SignatureBytes, SignatureT, SignerBytes, SignerT,
+    VerifierBytes, VerifierT, ensure, error,
 };
 
 //
@@ -12,11 +12,11 @@ use crate::{
 /// See <https://www.iana.org/assignments/jose/jose.xhtml>
 pub const ED25519_JOSE_ALGORITHM: &str = "Ed25519";
 
-impl SignatureDynT for ed25519_dalek::Signature {
+impl SignatureT for ed25519_dalek::Signature {
     fn jose_algorithm(&self) -> &'static str {
         ED25519_JOSE_ALGORITHM
     }
-    fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
+    fn get_raw_bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
         self.to_vec().into()
     }
 }
@@ -30,7 +30,7 @@ impl TryFrom<&SignatureBytes<'_>> for ed25519_dalek::Signature {
             ED25519_JOSE_ALGORITHM,
             signature_bytes.jose_algorithm(),
         );
-        let signature_byte_v = signature_bytes.bytes();
+        let signature_byte_v = signature_bytes.get_raw_bytes();
         let byte_array = <&[u8; 64]>::try_from(signature_byte_v.as_ref())?;
         Ok(ed25519_dalek::Signature::from_bytes(byte_array))
     }
@@ -40,17 +40,24 @@ impl TryFrom<&SignatureBytes<'_>> for ed25519_dalek::Signature {
 // SigningKey
 //
 
+impl ExtractableSignerT for ed25519_dalek::SigningKey {
+    fn extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
+        Ok(self.as_bytes().as_slice().into())
+    }
+}
+
 #[cfg(feature = "random")]
 impl crate::GenerateRandom for ed25519_dalek::SigningKey {
     fn generate_random() -> Self {
-        ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng)
+        let mut rng = rand::rand_core::UnwrapErr(rand::rngs::SysRng);
+        ed25519_dalek::SigningKey::generate(&mut rng)
     }
 }
 
 #[cfg(feature = "pkcs8")]
 impl crate::PKCS8Read for ed25519_dalek::SigningKey {
     fn read_from_pkcs8_pem_file(path: &std::path::Path) -> Result<Self> {
-        use pkcs8::DecodePrivateKey;
+        use ed25519_dalek::ed25519::pkcs8::DecodePrivateKey;
         Ok(ed25519_dalek::SigningKey::read_pkcs8_pem_file(path)?)
     }
 }
@@ -58,25 +65,25 @@ impl crate::PKCS8Read for ed25519_dalek::SigningKey {
 #[cfg(feature = "pkcs8")]
 impl crate::PKCS8Write for ed25519_dalek::SigningKey {
     fn write_to_pkcs8_pem_file(&self, path: &std::path::Path) -> Result<()> {
-        use pkcs8::EncodePrivateKey;
+        use ed25519_dalek::ed25519::pkcs8::EncodePrivateKey;
         Ok(self.write_pkcs8_pem_file(path, Default::default())?)
     }
 }
 
-impl SignerDynT for ed25519_dalek::SigningKey {
+impl SignerT for ed25519_dalek::SigningKey {
+    fn key_id(&self) -> Option<String> {
+        None
+    }
     fn key_type(&self) -> KeyType {
         KeyType::Ed25519
     }
-    fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
-        self.as_bytes().as_slice().into()
-    }
-    fn verifier_dyn(&self) -> Result<Box<dyn VerifierDynT>> {
+    fn get_verifier(&self) -> Result<Box<dyn VerifierT>> {
         Ok(Box::new(self.verifying_key()))
     }
-    fn verifier_bytes<'b, 's: 'b>(&'s self) -> Result<VerifierBytes<'b>> {
+    fn get_verifier_bytes<'b, 's: 'b>(&'s self) -> Result<VerifierBytes<'b>> {
         Ok(self.verifying_key().to_verifier_bytes().into_owned())
     }
-    fn try_sign_message(&self, message_byte_v: &[u8]) -> Result<Box<dyn SignatureDynT>> {
+    fn try_sign_message(&self, message_byte_v: &[u8]) -> Result<Box<dyn SignatureT>> {
         use signature::Signer;
         Ok(Box::new(self.try_sign(message_byte_v)?))
     }
@@ -101,21 +108,21 @@ impl TryFrom<&SignerBytes<'_>> for ed25519_dalek::SigningKey {
 // VerifyingKey
 //
 
-impl VerifierDynT for ed25519_dalek::VerifyingKey {
+impl VerifierT for ed25519_dalek::VerifyingKey {
     fn key_type(&self) -> KeyType {
         KeyType::Ed25519
     }
-    fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
+    fn get_raw_bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
         self.as_bytes().as_slice().into()
     }
-    fn verify_message(&self, message_byte_v: &[u8], signature: &dyn SignatureDynT) -> Result<()> {
+    fn verify_message(&self, message_byte_v: &[u8], signature: &dyn SignatureT) -> Result<()> {
         ensure!(
             signature.jose_algorithm() == ED25519_JOSE_ALGORITHM,
             "expected signature algorithm to be {:?}, but got {:?}",
             ED25519_JOSE_ALGORITHM,
             signature.jose_algorithm(),
         );
-        let signature = ed25519_dalek::Signature::try_from(signature.bytes().as_ref())?;
+        let signature = ed25519_dalek::Signature::try_from(signature.get_raw_bytes().as_ref())?;
         use signature::Verifier;
         self.verify(message_byte_v, &signature).map_err(|e| {
             error!(
@@ -135,7 +142,7 @@ impl TryFrom<&VerifierBytes<'_>> for ed25519_dalek::VerifyingKey {
             KeyType::Ed25519,
             verifier_bytes.key_type(),
         );
-        let verifier_byte_v = verifier_bytes.bytes();
+        let verifier_byte_v = verifier_bytes.get_raw_bytes();
         let byte_array = <&[u8; 32]>::try_from(verifier_byte_v.as_ref())?;
         Ok(ed25519_dalek::VerifyingKey::from_bytes(byte_array)?)
     }

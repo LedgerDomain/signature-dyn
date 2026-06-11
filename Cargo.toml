@@ -1,39 +1,37 @@
 [package]
 name = "signature-dyn"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 [features]
-ed25519-dalek = ["dep:ed25519-dalek", "signature"]
-ed448-goldilocks = ["dep:ed448-goldilocks", "signature"]
-generate = ["dep:rand", "dep:rand_0_9"]
-k256 = ["dep:k256", "signature"]
-p256 = ["dep:p256", "signature"]
-p384 = ["dep:p384", "signature"]
-p521 = ["dep:p521", "dep:signature_3"]
-pkcs8 = ["ed25519-dalek?/pem", "dep:pkcs8", "dep:pkcs8_0_11"]
-random = ["dep:rand", "dep:rand_0_9"]
+async = ["dep:async-trait"]
+ed25519-dalek = ["dep:ed25519-dalek", "dep:signature"]
+ed448-goldilocks = ["dep:ed448-goldilocks", "dep:signature"]
+generate = ["dep:rand"]
+k256 = ["dep:k256", "dep:signature"]
+p256 = ["dep:p256", "dep:signature"]
+p384 = ["dep:p384", "dep:signature"]
+p521 = ["dep:p521", "dep:signature"]
+pkcs8 = ["ed25519-dalek?/pem", "dep:pkcs8"]
+random = ["ed25519-dalek?/rand_core", "dep:rand"]
 serde = ["dep:serde"]
-signature = ["dep:signature", "dep:signature_3"]
+signature = ["dep:signature"]
 ssi-multicodec = ["dep:ssi-multicodec"]
 
 [dependencies]
-ed25519-dalek = { version = "2.2.0", optional = true }
-ed448-goldilocks = { version = "0.14.0-pre.4", optional = true }
-k256 = { version = "0.13.4", optional = true }
-p256 = { version = "0.13.2", optional = true }
-p384 = { version = "0.13.1", optional = true }
-p521 = { version = "0.14.0-pre.11", optional = true, features = ["ecdsa"] }
-pkcs8 = { version = "0.10", optional = true }
-pkcs8_0_11 = { package = "pkcs8", version = "0.11.0-rc.6", optional = true }
-rand = { version = "0.8", optional = true }
-rand_0_9 = { package = "rand", version = "0.9.2", optional = true, features = [
-    "os_rng",
-] }
+async-trait = { version = "0.1.89", optional = true }
+ed25519-dalek = { version = "3.0.0-rc.0", optional = true }
+ed448-goldilocks = { version = "0.14.0-pre.13", optional = true }
+k256 = { version = "0.14.0-rc.11", optional = true }
+p256 = { version = "0.14.0-rc.11", optional = true }
+p384 = { version = "0.14.0-rc.11", optional = true }
+p521 = { version = "0.14.0-rc.11", optional = true, features = ["ecdsa"] }
+pkcs8 = { package = "pkcs8", version = "0.11.0", optional = true }
+rand = { version = "0.10.1", optional = true, features = ["sys_rng"] }
 serde = { version = "1.0.225", optional = true, features = ["derive"] }
-signature = { version = "2.2.0", optional = true }
-signature_3 = { package = "signature", version = "3.0.0-rc.4", optional = true }
+signature = { package = "signature", version = "3.0", optional = true }
 ssi-multicodec = { version = "0.2.0", optional = true }
 
 [dev-dependencies]
-ed25519-dalek = { version = "*", features = ["rand_core"] }
+ed25519-dalek = { version = "3.0.0-rc.0", features = ["rand_core"] }
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }

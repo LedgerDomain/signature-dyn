@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{KeyType, Result, SignatureDynT, VerifierDynT};
+use crate::{KeyType, Result, SignatureT, VerifierT};
 
 /// Structure that represents a verifier without requiring direct use of the underlying cryptographic libraries.
 /// Useful for interoperability.
@@ -64,14 +64,14 @@ impl<'a> VerifierBytes<'a> {
     }
 }
 
-impl<'a> VerifierDynT for VerifierBytes<'a> {
+impl<'a> VerifierT for VerifierBytes<'a> {
     fn key_type(&self) -> KeyType {
         self.key_type
     }
-    fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
+    fn get_raw_bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
         self.byte_v.clone()
     }
-    fn verify_message(&self, message_byte_v: &[u8], signature: &dyn SignatureDynT) -> Result<()> {
+    fn verify_message(&self, message_byte_v: &[u8], signature: &dyn SignatureT) -> Result<()> {
         match self.key_type {
             KeyType::Ed25519 => {
                 #[cfg(feature = "ed25519-dalek")]
@@ -100,7 +100,7 @@ impl<'a> VerifierDynT for VerifierBytes<'a> {
                         ed448_goldilocks::VerifyingKey::try_from(self)?;
                     let ed448_goldilocks_signature =
                         ed448_goldilocks::Signature::try_from(&signature.to_signature_bytes())?;
-                    use signature_3::Verifier;
+                    use signature::Verifier;
                     ed448_goldilocks_verifying_key
                         .verify(message_byte_v, &ed448_goldilocks_signature)
                         .map_err(|e| crate::error!("Ed448 signature verification failed: {}", e))
@@ -154,7 +154,7 @@ impl<'a> VerifierDynT for VerifierBytes<'a> {
                     let p521_verifying_key = p521::ecdsa::VerifyingKey::try_from(self)?;
                     let p521_signature =
                         p521::ecdsa::Signature::try_from(&signature.to_signature_bytes())?;
-                    use signature_3::Verifier;
+                    use signature::Verifier;
                     p521_verifying_key
                         .verify(message_byte_v, &p521_signature)
                         .map_err(|e| crate::error!("P521 signature verification failed: {}", e))

@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
-use crate::{KeyType, Result, SignatureDynT, SignerDynT, VerifierDynT};
+use crate::{
+    KeyType, Result, SignatureT, SignerT, VerifierT, extractable_signer_t::ExtractableSignerT,
+};
 
 /// This is a generic data structure to represent private keys that doesn't require direct use of the underlying
 /// cryptographic libraries.  This is useful for serialization and deserialization of private keys.
@@ -121,21 +123,24 @@ impl<'a> crate::PKCS8Write for SignerBytes<'a> {
     }
 }
 
-impl<'a> SignerDynT for SignerBytes<'a> {
+impl<'a> SignerT for SignerBytes<'a> {
+    fn key_id(&self) -> Option<String> {
+        None
+    }
     fn key_type(&self) -> KeyType {
         self.key_type
     }
-    fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
-        self.byte_v.clone()
-    }
-    fn verifier_dyn(&self) -> Result<Box<dyn VerifierDynT>> {
+    // fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
+    //     self.byte_v.clone()
+    // }
+    fn get_verifier(&self) -> Result<Box<dyn VerifierT>> {
         match self.key_type {
             KeyType::Ed25519 => {
                 #[cfg(feature = "ed25519-dalek")]
                 {
                     let signing_key = ed25519_dalek::SigningKey::try_from(self)?;
                     let verifying_key = signing_key.verifying_key();
-                    let verifier_dyn_b: Box<dyn VerifierDynT> = Box::new(verifying_key);
+                    let verifier_dyn_b: Box<dyn VerifierT> = Box::new(verifying_key);
                     Ok(verifier_dyn_b)
                 }
                 #[cfg(not(feature = "ed25519-dalek"))]
@@ -148,7 +153,7 @@ impl<'a> SignerDynT for SignerBytes<'a> {
                 {
                     let signing_key = ed448_goldilocks::SigningKey::try_from(self)?;
                     let verifying_key = signing_key.verifying_key();
-                    let verifier_dyn_b: Box<dyn VerifierDynT> = Box::new(verifying_key);
+                    let verifier_dyn_b: Box<dyn VerifierT> = Box::new(verifying_key);
                     Ok(verifier_dyn_b)
                 }
                 #[cfg(not(feature = "ed448-goldilocks"))]
@@ -161,7 +166,7 @@ impl<'a> SignerDynT for SignerBytes<'a> {
                 {
                     let signing_key = p256::ecdsa::SigningKey::try_from(self)?;
                     let verifying_key = signing_key.verifying_key().clone();
-                    let verifier_dyn_b: Box<dyn VerifierDynT> = Box::new(verifying_key);
+                    let verifier_dyn_b: Box<dyn VerifierT> = Box::new(verifying_key);
                     Ok(verifier_dyn_b)
                 }
                 #[cfg(not(feature = "p256"))]
@@ -174,7 +179,7 @@ impl<'a> SignerDynT for SignerBytes<'a> {
                 {
                     let signing_key = p384::ecdsa::SigningKey::try_from(self)?;
                     let verifying_key = signing_key.verifying_key().clone();
-                    let verifier_dyn_b: Box<dyn VerifierDynT> = Box::new(verifying_key);
+                    let verifier_dyn_b: Box<dyn VerifierT> = Box::new(verifying_key);
                     Ok(verifier_dyn_b)
                 }
                 #[cfg(not(feature = "p384"))]
@@ -187,7 +192,7 @@ impl<'a> SignerDynT for SignerBytes<'a> {
                 {
                     let signing_key = p521::ecdsa::SigningKey::try_from(self)?;
                     let verifying_key = signing_key.verifying_key().clone();
-                    let verifier_dyn_b: Box<dyn VerifierDynT> = Box::new(verifying_key);
+                    let verifier_dyn_b: Box<dyn VerifierT> = Box::new(verifying_key);
                     Ok(verifier_dyn_b)
                 }
                 #[cfg(not(feature = "p521"))]
@@ -203,7 +208,7 @@ impl<'a> SignerDynT for SignerBytes<'a> {
                 {
                     let signing_key = k256::ecdsa::SigningKey::try_from(self)?;
                     let verifying_key = signing_key.verifying_key().clone();
-                    let verifier_dyn_b: Box<dyn VerifierDynT> = Box::new(verifying_key);
+                    let verifier_dyn_b: Box<dyn VerifierT> = Box::new(verifying_key);
                     Ok(verifier_dyn_b)
                 }
                 #[cfg(not(feature = "k256"))]
@@ -219,10 +224,10 @@ impl<'a> SignerDynT for SignerBytes<'a> {
             }
         }
     }
-    fn to_signer_bytes<'b, 's: 'b>(&'s self) -> SignerBytes<'b> {
-        self.clone()
-    }
-    fn try_sign_message(&self, message_byte_v: &[u8]) -> Result<Box<dyn SignatureDynT>> {
+    // fn to_signer_bytes<'b, 's: 'b>(&'s self) -> SignerBytes<'b> {
+    //     self.clone()
+    // }
+    fn try_sign_message(&self, message_byte_v: &[u8]) -> Result<Box<dyn SignatureT>> {
         match self.key_type {
             KeyType::Ed25519 => {
                 #[cfg(feature = "ed25519-dalek")]
@@ -244,7 +249,7 @@ impl<'a> SignerDynT for SignerBytes<'a> {
                 #[cfg(feature = "ed448-goldilocks")]
                 {
                     let signing_key = ed448_goldilocks::SigningKey::try_from(self)?;
-                    use signature_3::Signer;
+                    use signature::Signer;
                     let signature: ed448_goldilocks::Signature = signing_key
                         .try_sign(message_byte_v)
                         .map_err(|e| crate::error!("Ed448 signature signing failed: {}", e))?;
@@ -292,7 +297,7 @@ impl<'a> SignerDynT for SignerBytes<'a> {
                 #[cfg(feature = "p521")]
                 {
                     let signing_key = p521::ecdsa::SigningKey::try_from(self)?;
-                    use signature_3::Signer;
+                    use signature::Signer;
                     let signature: p521::ecdsa::Signature = signing_key
                         .try_sign(message_byte_v)
                         .map_err(|e| crate::error!("P521 signature signing failed: {}", e))?;
@@ -333,5 +338,11 @@ impl<'a> SignerDynT for SignerBytes<'a> {
                 todo!();
             }
         }
+    }
+}
+
+impl<'a> ExtractableSignerT for SignerBytes<'a> {
+    fn extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
+        Ok(Cow::Borrowed(self.bytes()))
     }
 }

@@ -212,7 +212,7 @@ impl KeyType {
     /// Generate a random private key for this key type.  Note that each KeyType variant requires
     /// enabling the feature for the corresponding crate.
     #[cfg(feature = "random")]
-    pub fn generate_random_private_key(self) -> Box<dyn crate::SignerDynT> {
+    pub fn generate_random_private_key(self) -> Box<dyn crate::ExtractableSignerT> {
         use crate::GenerateRandom;
         match self {
             KeyType::Ed25519 => {

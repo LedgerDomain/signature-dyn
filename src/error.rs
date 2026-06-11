@@ -20,6 +20,18 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+impl From<String> for Error {
+    fn from(e: String) -> Self {
+        Error::from_cow(Cow::Owned(e))
+    }
+}
+
+impl From<&'static str> for Error {
+    fn from(e: &'static str) -> Self {
+        Error::from_cow(Cow::Borrowed(e))
+    }
+}
+
 #[cfg(feature = "pkcs8")]
 impl From<pkcs8::Error> for Error {
     fn from(e: pkcs8::Error) -> Self {
@@ -27,23 +39,17 @@ impl From<pkcs8::Error> for Error {
     }
 }
 
-#[cfg(feature = "pkcs8")]
-impl From<pkcs8_0_11::Error> for Error {
-    fn from(e: pkcs8_0_11::Error) -> Self {
-        Error::from_cow(Cow::Owned(e.to_string()))
-    }
-}
-
-#[cfg(feature = "signature")]
+#[cfg(any(
+    feature = "ed25519-dalek",
+    feature = "ed448-goldilocks",
+    feature = "k256",
+    feature = "p256",
+    feature = "p384",
+    feature = "p521",
+    feature = "signature"
+))]
 impl From<signature::Error> for Error {
     fn from(e: signature::Error) -> Self {
-        Error::from_cow(Cow::Owned(e.to_string()))
-    }
-}
-
-#[cfg(feature = "signature")]
-impl From<signature_3::Error> for Error {
-    fn from(e: signature_3::Error) -> Self {
         Error::from_cow(Cow::Owned(e.to_string()))
     }
 }
