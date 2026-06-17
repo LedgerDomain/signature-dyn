@@ -17,7 +17,7 @@ impl SignatureT for ed25519_dalek::Signature {
         ED25519_JOSE_ALGORITHM
     }
     fn get_raw_bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
-        self.to_vec().into()
+        Vec::from(self.to_bytes()).into()
     }
 }
 
