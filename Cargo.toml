@@ -1,13 +1,12 @@
 [package]
 name = "signature-dyn"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 
 [features]
 async = ["dep:async-trait"]
 ed25519-dalek = ["dep:ed25519-dalek", "dep:signature"]
 ed448-goldilocks = ["dep:ed448-goldilocks", "dep:signature"]
-generate = ["dep:rand"]
 k256 = ["dep:k256", "dep:signature"]
 p256 = ["dep:p256", "dep:signature"]
 p384 = ["dep:p384", "dep:signature"]
