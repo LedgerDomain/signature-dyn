@@ -2,12 +2,10 @@ use crate::{KeyType, Result, SignatureT, VerifierBytes, VerifierT};
 
 /// Dyn-compatible trait for signers, i.e. private keys that can be used to sign messages.
 ///
-/// Related traits:
-/// - [ExtractableSignerT] for signers whose private key material can be extracted.
-/// - [AsyncSignerT] for signers that can be used in asynchronous contexts.
-/// - [SignerBytes] for the byte representation of a signer.
-/// - [VerifierT] for the verifier corresponding to a signer.
-/// - [VerifierBytes] for the byte representation of a verifier.
+/// See [AsAsyncSigner] for a wrapper type that allows a `&(dyn SignerT + Send + Sync)` to
+/// be used as an `AsyncSignerT`.
+///
+/// Related traits: [ExtractableSignerT], [AsyncSignerT].
 pub trait SignerT {
     /// Return the key id of this SignerT -- i.e. the value that should be used in the "kid" field
     /// of a JWS or other signed artifact.  If a key id is unavailable or undefined, return None.
@@ -19,12 +17,6 @@ pub trait SignerT {
     fn jose_algorithm(&self) -> &'static str {
         self.key_type().jose_algorithm()
     }
-    // /// Return the byte representation of this SignerT.
-    // fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]>;
-    // /// Returns the SignerBytes representation of this SignerT, which is useful for interoperability.
-    // fn to_signer_bytes<'b, 's: 'b>(&'s self) -> SignerBytes<'b> {
-    //     SignerBytes::new(self.key_type(), self.bytes()).expect("Failed to create SignerBytes")
-    // }
     /// Returns the corresponding verifier which can verify signatures that this SignerT produces.
     fn get_verifier(&self) -> Result<Box<dyn VerifierT>>;
     /// Returns the VerifierBytes representation of `self.verifier_dyn()`, i.e. its pub key.

@@ -43,7 +43,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(feature = "pkcs8")]
 pub use pkcs8::{PKCS8Read, PKCS8Write};
 #[cfg(feature = "async")]
-pub use {async_extractable_signer_t::AsyncExtractableSignerT, async_signer_t::AsyncSignerT};
+pub use {
+    async_extractable_signer_t::{AsAsyncExtractableSigner, AsyncExtractableSignerT},
+    async_signer_t::{AsAsyncSigner, AsyncSignerT},
+};
 
 /// See <https://www.iana.org/assignments/jose/jose.xhtml>
 pub const ED25519_JOSE_ALGORITHM: &str = "Ed25519";

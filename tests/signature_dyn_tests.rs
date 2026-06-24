@@ -40,8 +40,10 @@ async fn test_sign_verify_commutative_diagram_case_async<Signature, Signer, Veri
 ) where
     Signature: signature_dyn::SignatureT,
     Signer: signature::Signer<Signature>
-        + signature_dyn::ExtractableSignerT
-        + signature_dyn::AsyncSignerT,
+        + signature_dyn::AsyncExtractableSignerT
+        + signature_dyn::AsyncSignerT
+        + Send
+        + Sync,
     Verifier: signature::Verifier<Signature> + signature_dyn::VerifierT,
 {
     use signature_dyn::{SignerT, VerifierT};
@@ -52,7 +54,7 @@ async fn test_sign_verify_commutative_diagram_case_async<Signature, Signer, Veri
     verifier.verify(message, &signature).expect("pass");
     let expected_signature_bytes = signature.to_signature_bytes();
 
-    let signer_bytes = signer.extract_signer_bytes().expect("pass");
+    let signer_bytes = signer.async_extract_signer_bytes().await.expect("pass");
     let verifier_bytes = verifier.to_verifier_bytes();
     let signature_b = signer_bytes.try_sign_message(message).expect("pass");
     verifier_bytes
@@ -434,5 +436,70 @@ fn test_pkcs8() {
     {
         let signing_key = k256::ecdsa::SigningKey::generate_random();
         test_pkcs8_impl(signing_key.key_type(), &signing_key);
+    }
+}
+
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_as_async_signer() {
+    async fn feed_me_an_async_signer(
+        async_signer: &(dyn signature_dyn::AsyncSignerT + Send + Sync),
+    ) {
+        let signature_b = async_signer
+            .async_try_sign_message(b"HIPPO")
+            .await
+            .expect("pass");
+        let verifier_b = async_signer.async_get_verifier().await.expect("pass");
+        verifier_b
+            .verify_message(b"HIPPO", signature_b.as_ref())
+            .expect("pass");
+    }
+
+    use signature_dyn::GenerateRandom;
+    let signing_key = ed25519_dalek::SigningKey::generate_random();
+
+    feed_me_an_async_signer(&signature_dyn::AsAsyncSigner::new(&signing_key)).await;
+
+    {
+        // Type erasure so that we test the cast from SignerT to AsyncSignerT.
+        let signer_b: Box<dyn signature_dyn::SignerT + Send + Sync> = Box::new(signing_key);
+        feed_me_an_async_signer(&signature_dyn::AsAsyncSigner::new(signer_b.as_ref())).await;
+    }
+}
+
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_as_async_extractable_signer() {
+    async fn feed_me_an_async_extractable_signer(
+        async_extractable_signer: &(dyn signature_dyn::AsyncExtractableSignerT + Send + Sync),
+    ) {
+        let signer_bytes = async_extractable_signer
+            .async_extract_signer_bytes()
+            .await
+            .expect("pass");
+        use signature_dyn::SignerT;
+        let signature_b = signer_bytes.try_sign_message(b"HIPPO").expect("pass");
+        let verifier_b = signer_bytes.get_verifier().expect("pass");
+        verifier_b
+            .verify_message(b"HIPPO", signature_b.as_ref())
+            .expect("pass");
+    }
+
+    use signature_dyn::GenerateRandom;
+    let signing_key = ed25519_dalek::SigningKey::generate_random();
+
+    feed_me_an_async_extractable_signer(&signature_dyn::AsAsyncExtractableSigner::new(
+        &signing_key,
+    ))
+    .await;
+
+    {
+        // Type erasure so that we test the cast from SignerT to AsyncSignerT.
+        let signer_b: Box<dyn signature_dyn::ExtractableSignerT + Send + Sync> =
+            Box::new(signing_key);
+        feed_me_an_async_extractable_signer(&signature_dyn::AsAsyncExtractableSigner::new(
+            signer_b.as_ref(),
+        ))
+        .await;
     }
 }

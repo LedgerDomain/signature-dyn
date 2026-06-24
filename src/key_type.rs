@@ -85,10 +85,10 @@ impl KeyType {
         match self {
             KeyType::Ed25519 => ssi_multicodec::ED25519_PRIV,
             KeyType::Ed448 => {
-                panic!(
-                    "codec for ed448-priv doesn't yet exist; see https://github.com/multiformats/multicodec/pull/390"
-                );
-                // ssi_multicodec::ED448_PRIV
+                // Note that this codec was merged into multicodec in https://github.com/multiformats/multicodec/pull/390,
+                // but ssi-multicodec crate hasn't been updated with it yet.
+                // TODO: Replace with ssi_multicodec::ED448_PRIV when ssi-multicodec is updated.
+                0x1311
             }
             KeyType::P256 => ssi_multicodec::P256_PRIV,
             KeyType::P384 => ssi_multicodec::P384_PRIV,
@@ -119,12 +119,10 @@ impl KeyType {
     pub fn try_from_priv_key_codec(codec: u64) -> Result<Self> {
         match codec {
             ssi_multicodec::ED25519_PRIV => Ok(KeyType::Ed25519),
-            // ssi_multicodec::ED448_PRIV => {
-            //     panic!(
-            //         "codec for ed448-priv doesn't yet exist; see https://github.com/multiformats/multicodec/pull/390"
-            //     );
-            //     // Ok(KeyType::Ed448)
-            // }
+            // Note that this codec was merged into multicodec in https://github.com/multiformats/multicodec/pull/390,
+            // but ssi-multicodec crate hasn't been updated with it yet.
+            // TODO: Replace with ssi_multicodec::ED448_PRIV when ssi-multicodec is updated.
+            0x1311 => Ok(KeyType::Ed448),
             ssi_multicodec::P256_PRIV => Ok(KeyType::P256),
             ssi_multicodec::P384_PRIV => Ok(KeyType::P384),
             ssi_multicodec::P521_PRIV => Ok(KeyType::P521),
@@ -178,12 +176,10 @@ impl KeyType {
     pub fn try_from_codec(codec: u64) -> Result<Self> {
         match codec {
             ssi_multicodec::ED25519_PRIV | ssi_multicodec::ED25519_PUB => Ok(KeyType::Ed25519),
-            // ssi_multicodec::ED448_PRIV => {
-            //     panic!(
-            //         "codec for ed448-priv doesn't yet exist; see https://github.com/multiformats/multicodec/pull/390"
-            //     );
-            //     // Ok(KeyType::Ed448)
-            // }
+            // Note that this codec was merged into multicodec in https://github.com/multiformats/multicodec/pull/390,
+            // but ssi-multicodec crate hasn't been updated with it yet.
+            // TODO: Replace with ssi_multicodec::ED448_PRIV when ssi-multicodec is updated.
+            0x1311 => Ok(KeyType::Ed448),
             ssi_multicodec::ED448_PUB => Ok(KeyType::Ed448),
             ssi_multicodec::P256_PRIV | ssi_multicodec::P256_PUB => Ok(KeyType::P256),
             ssi_multicodec::P384_PRIV | ssi_multicodec::P384_PUB => Ok(KeyType::P384),
@@ -212,7 +208,7 @@ impl KeyType {
     /// Generate a random private key for this key type.  Note that each KeyType variant requires
     /// enabling the feature for the corresponding crate.
     #[cfg(feature = "random")]
-    pub fn generate_random_private_key(self) -> Box<dyn crate::ExtractableSignerT> {
+    pub fn generate_random_private_key(self) -> Box<dyn crate::ExtractableSignerT + Send + Sync> {
         use crate::GenerateRandom;
         match self {
             KeyType::Ed25519 => {
