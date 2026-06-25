@@ -6,7 +6,7 @@ use crate::{KeyType, Result, SignatureT, VerifierBytes, VerifierT};
 /// be used as an `AsyncSignerT`.
 ///
 /// Related traits: [ExtractableSignerT], [AsyncSignerT].
-pub trait SignerT {
+pub trait SignerT: zeroize::ZeroizeOnDrop {
     /// Return the key id of this SignerT -- i.e. the value that should be used in the "kid" field
     /// of a JWS or other signed artifact.  If a key id is unavailable or undefined, return None.
     fn key_id(&self) -> Option<String>;

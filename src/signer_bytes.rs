@@ -6,7 +6,7 @@ use crate::{
 
 /// This is a generic data structure to represent private keys that doesn't require direct use of the underlying
 /// cryptographic libraries.  This is useful for serialization and deserialization of private keys.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SignerBytes<'a> {
     pub(crate) key_type: KeyType,
@@ -52,13 +52,15 @@ impl<'a> SignerBytes<'a> {
     pub fn bytes(&self) -> &[u8] {
         self.byte_v.as_ref()
     }
-    pub fn into_byte_v(self) -> Cow<'a, [u8]> {
-        self.byte_v
-    }
-    pub fn into_owned<'b>(self) -> SignerBytes<'b> {
-        SignerBytes {
+    pub fn into_owned<'b>(mut self) -> SignerBytes<'b> {
+        // This dummy and swap business is because ZeroizeOnDrop impls Drop for this
+        // type, and that prevents moving out of self.
+        let mut dummy = Cow::Borrowed(&[] as &[u8]);
+        std::mem::swap(&mut dummy, &mut self.byte_v);
+        let byte_v = dummy.into_owned();
+        SignerBytes::<'b> {
             key_type: self.key_type,
-            byte_v: Cow::Owned(self.byte_v.into_owned()),
+            byte_v: Cow::Owned(byte_v),
         }
     }
     pub fn to_owned<'b>(&self) -> SignerBytes<'b> {
@@ -66,6 +68,37 @@ impl<'a> SignerBytes<'a> {
             key_type: self.key_type.clone(),
             byte_v: Cow::Owned(self.byte_v.to_vec()),
         }
+    }
+}
+
+impl<'a> std::fmt::Debug for SignerBytes<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SignerBytes")
+            .field("key_type", &self.key_type)
+            .field("bytes", &"<REDACTED>")
+            .finish()
+    }
+}
+
+/// Note that this only zeroes the private key material, not the key type.
+impl<'a> std::ops::Drop for SignerBytes<'a> {
+    fn drop(&mut self) {
+        // No need to zeroize the key type.
+
+        let mut dummy = Cow::Borrowed(&[] as &[u8]);
+        std::mem::swap(&mut dummy, &mut self.byte_v);
+        // dummy now contains the original content of self.byte_v, which we can zeroize
+        // if it's a Cow::Owned.  If it's a Cow::Borrowed, we can't zeroize it, but ostensibly
+        // it was borrowed from something that impls ZeroizeOnDrop.
+        if let Cow::Owned(mut byte_v) = dummy {
+            zeroize::Zeroize::zeroize(&mut byte_v);
+        }
+    }
+}
+
+impl<'a> ExtractableSignerT for SignerBytes<'a> {
+    fn extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
+        Ok(Cow::Borrowed(self.bytes()))
     }
 }
 
@@ -341,8 +374,5 @@ impl<'a> SignerT for SignerBytes<'a> {
     }
 }
 
-impl<'a> ExtractableSignerT for SignerBytes<'a> {
-    fn extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
-        Ok(Cow::Borrowed(self.bytes()))
-    }
-}
+/// The Drop impl handles the zeroization of the private key material.
+impl<'a> zeroize::ZeroizeOnDrop for SignerBytes<'a> {}
