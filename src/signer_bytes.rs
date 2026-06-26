@@ -1,49 +1,22 @@
-use std::borrow::Cow;
+use zeroize::Zeroizing;
 
 use crate::{
-    KeyType, Result, SignatureT, SignerT, VerifierT, extractable_signer_t::ExtractableSignerT,
+    KeyType, Result, SignatureT, SignerT, VerifierT, ensure,
+    extractable_signer_t::ExtractableSignerT,
 };
 
 /// This is a generic data structure to represent private keys that doesn't require direct use of the underlying
 /// cryptographic libraries.  This is useful for serialization and deserialization of private keys.
 #[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct SignerBytes<'a> {
+pub struct SignerBytes {
     pub(crate) key_type: KeyType,
-    pub(crate) byte_v: Cow<'a, [u8]>,
+    pub(crate) byte_v: Zeroizing<Vec<u8>>,
 }
 
-impl<'a> SignerBytes<'a> {
-    pub fn new(key_type: KeyType, byte_v: Cow<'a, [u8]>) -> Result<Self> {
-        match key_type {
-            KeyType::Ed25519 => {
-                // TODO: Validation
-            }
-            KeyType::Ed448 => {
-                // TODO: Validation
-            }
-            KeyType::P256 => {
-                // TODO: Validation
-            }
-            KeyType::P384 => {
-                // TODO: Validation
-            }
-            KeyType::P521 => {
-                // TODO: Validation
-            }
-            KeyType::RSA => {
-                // TODO: Validation
-            }
-            KeyType::Secp256k1 => {
-                // TODO: Validation
-            }
-            KeyType::Sr25519 => {
-                // TODO: Validation
-            }
-            KeyType::X25519 => {
-                // TODO: Validation
-            }
-        }
+impl SignerBytes {
+    pub fn new(key_type: KeyType, byte_v: Zeroizing<Vec<u8>>) -> Result<Self> {
+        Self::validate_key_type(key_type, byte_v.as_slice())?;
         Ok(Self { key_type, byte_v })
     }
     pub fn key_type(&self) -> KeyType {
@@ -52,26 +25,45 @@ impl<'a> SignerBytes<'a> {
     pub fn bytes(&self) -> &[u8] {
         self.byte_v.as_ref()
     }
-    pub fn into_owned<'b>(mut self) -> SignerBytes<'b> {
-        // This dummy and swap business is because ZeroizeOnDrop impls Drop for this
-        // type, and that prevents moving out of self.
-        let mut dummy = Cow::Borrowed(&[] as &[u8]);
-        std::mem::swap(&mut dummy, &mut self.byte_v);
-        let byte_v = dummy.into_owned();
-        SignerBytes::<'b> {
-            key_type: self.key_type,
-            byte_v: Cow::Owned(byte_v),
-        }
+    /// Forgets the KeyType and returns the private key material as a Zeroizing<Vec<u8>>.
+    pub fn into_bytes(mut self) -> Zeroizing<Vec<u8>> {
+        std::mem::take(&mut self.byte_v)
     }
-    pub fn to_owned<'b>(&self) -> SignerBytes<'b> {
-        SignerBytes {
-            key_type: self.key_type.clone(),
-            byte_v: Cow::Owned(self.byte_v.to_vec()),
+    fn validate_key_type(key_type: KeyType, byte_v: &[u8]) -> Result<()> {
+        match key_type {
+            KeyType::Ed25519 => {
+                ensure!(byte_v.len() == 32, "expected 32 bytes for Ed25519");
+            }
+            KeyType::Ed448 => {
+                ensure!(byte_v.len() == 57, "expected 57 bytes for Ed448");
+            }
+            KeyType::P256 => {
+                ensure!(byte_v.len() == 32, "expected 32 bytes for P256");
+            }
+            KeyType::P384 => {
+                ensure!(byte_v.len() == 48, "expected 48 bytes for P384");
+            }
+            KeyType::P521 => {
+                ensure!(byte_v.len() == 66, "expected 66 bytes for P521");
+            }
+            KeyType::RSA => {
+                // TODO: Validation
+            }
+            KeyType::Secp256k1 => {
+                ensure!(byte_v.len() == 32, "expected 32 bytes for Secp256k1");
+            }
+            KeyType::Sr25519 => {
+                // TODO: Validation
+            }
+            KeyType::X25519 => {
+                // TODO: Validation
+            }
         }
+        Ok(())
     }
 }
 
-impl<'a> std::fmt::Debug for SignerBytes<'a> {
+impl std::fmt::Debug for SignerBytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SignerBytes")
             .field("key_type", &self.key_type)
@@ -81,29 +73,21 @@ impl<'a> std::fmt::Debug for SignerBytes<'a> {
 }
 
 /// Note that this only zeroes the private key material, not the key type.
-impl<'a> std::ops::Drop for SignerBytes<'a> {
+impl std::ops::Drop for SignerBytes {
     fn drop(&mut self) {
         // No need to zeroize the key type.
-
-        let mut dummy = Cow::Borrowed(&[] as &[u8]);
-        std::mem::swap(&mut dummy, &mut self.byte_v);
-        // dummy now contains the original content of self.byte_v, which we can zeroize
-        // if it's a Cow::Owned.  If it's a Cow::Borrowed, we can't zeroize it, but ostensibly
-        // it was borrowed from something that impls ZeroizeOnDrop.
-        if let Cow::Owned(mut byte_v) = dummy {
-            zeroize::Zeroize::zeroize(&mut byte_v);
-        }
+        zeroize::Zeroize::zeroize(&mut self.byte_v);
     }
 }
 
-impl<'a> ExtractableSignerT for SignerBytes<'a> {
-    fn extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
-        Ok(Cow::Borrowed(self.bytes()))
+impl ExtractableSignerT for SignerBytes {
+    fn extract_signer_bytes(&self) -> Result<SignerBytes> {
+        Ok(self.clone())
     }
 }
 
 #[cfg(feature = "pkcs8")]
-impl<'a> crate::PKCS8Write for SignerBytes<'a> {
+impl crate::PKCS8Write for SignerBytes {
     fn write_to_pkcs8_pem_file(&self, path: &std::path::Path) -> Result<()> {
         match self.key_type {
             KeyType::Ed25519 => {
@@ -156,16 +140,13 @@ impl<'a> crate::PKCS8Write for SignerBytes<'a> {
     }
 }
 
-impl<'a> SignerT for SignerBytes<'a> {
+impl SignerT for SignerBytes {
     fn key_id(&self) -> Option<String> {
         None
     }
     fn key_type(&self) -> KeyType {
         self.key_type
     }
-    // fn bytes<'b, 's: 'b>(&'s self) -> Cow<'b, [u8]> {
-    //     self.byte_v.clone()
-    // }
     fn get_verifier(&self) -> Result<Box<dyn VerifierT>> {
         match self.key_type {
             KeyType::Ed25519 => {
@@ -257,9 +238,6 @@ impl<'a> SignerT for SignerBytes<'a> {
             }
         }
     }
-    // fn to_signer_bytes<'b, 's: 'b>(&'s self) -> SignerBytes<'b> {
-    //     self.clone()
-    // }
     fn try_sign_message(&self, message_byte_v: &[u8]) -> Result<Box<dyn SignatureT>> {
         match self.key_type {
             KeyType::Ed25519 => {
@@ -375,4 +353,4 @@ impl<'a> SignerT for SignerBytes<'a> {
 }
 
 /// The Drop impl handles the zeroization of the private key material.
-impl<'a> zeroize::ZeroizeOnDrop for SignerBytes<'a> {}
+impl zeroize::ZeroizeOnDrop for SignerBytes {}

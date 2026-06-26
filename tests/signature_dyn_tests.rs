@@ -503,3 +503,49 @@ async fn test_as_async_extractable_signer() {
         .await;
     }
 }
+
+#[test]
+fn test_priv_key_byte_lengths() {
+    #[cfg(feature = "ed25519-dalek")]
+    {
+        use signature_dyn::{ExtractableSignerT, GenerateRandom};
+        let signing_key = ed25519_dalek::SigningKey::generate_random();
+        let signer_bytes = signing_key.extract_signer_bytes().expect("pass");
+        assert_eq!(signer_bytes.bytes().len(), 32);
+    }
+    #[cfg(feature = "ed448-goldilocks")]
+    {
+        use signature_dyn::{ExtractableSignerT, GenerateRandom};
+        let signing_key = ed448_goldilocks::SigningKey::generate_random();
+        let signer_bytes = signing_key.extract_signer_bytes().expect("pass");
+        assert_eq!(signer_bytes.bytes().len(), 57);
+    }
+    #[cfg(feature = "k256")]
+    {
+        use signature_dyn::{ExtractableSignerT, GenerateRandom};
+        let signing_key = k256::ecdsa::SigningKey::generate_random();
+        let signer_bytes = signing_key.extract_signer_bytes().expect("pass");
+        assert_eq!(signer_bytes.bytes().len(), 32);
+    }
+    #[cfg(feature = "p256")]
+    {
+        use signature_dyn::{ExtractableSignerT, GenerateRandom};
+        let signing_key = p256::ecdsa::SigningKey::generate_random();
+        let signer_bytes = signing_key.extract_signer_bytes().expect("pass");
+        assert_eq!(signer_bytes.bytes().len(), 32);
+    }
+    #[cfg(feature = "p384")]
+    {
+        use signature_dyn::{ExtractableSignerT, GenerateRandom};
+        let signing_key = p384::ecdsa::SigningKey::generate_random();
+        let signer_bytes = signing_key.extract_signer_bytes().expect("pass");
+        assert_eq!(signer_bytes.bytes().len(), 48);
+    }
+    #[cfg(feature = "p521")]
+    {
+        use signature_dyn::{ExtractableSignerT, GenerateRandom};
+        let signing_key = p521::ecdsa::SigningKey::generate_random();
+        let signer_bytes = signing_key.extract_signer_bytes().expect("pass");
+        assert_eq!(signer_bytes.bytes().len(), 66);
+    }
+}

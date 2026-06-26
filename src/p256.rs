@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use zeroize::Zeroizing;
+
 use crate::{
     ExtractableSignerT, KeyType, P256_JOSE_ALGORITHM, Result, SignatureBytes, SignatureT,
     SignerBytes, SignerT, VerifierBytes, VerifierT, ensure, error,
@@ -39,9 +41,11 @@ impl TryFrom<&SignatureBytes<'_>> for p256::ecdsa::Signature {
 //
 
 impl ExtractableSignerT for p256::ecdsa::SigningKey {
-    fn extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
-        #[allow(deprecated)]
-        Ok(self.to_bytes().as_slice().to_vec().into())
+    fn extract_signer_bytes(&self) -> Result<SignerBytes> {
+        SignerBytes::new(
+            KeyType::P256,
+            Zeroizing::new(self.to_bytes().as_slice().to_vec()),
+        )
     }
 }
 
@@ -89,17 +93,16 @@ impl SignerT for p256::ecdsa::SigningKey {
     }
 }
 
-impl TryFrom<&SignerBytes<'_>> for p256::ecdsa::SigningKey {
+impl TryFrom<&SignerBytes> for p256::ecdsa::SigningKey {
     type Error = crate::Error;
-    fn try_from(signer_bytes: &SignerBytes<'_>) -> Result<Self> {
+    fn try_from(signer_bytes: &SignerBytes) -> Result<Self> {
         ensure!(
             signer_bytes.key_type() == KeyType::P256,
             "expected key type to be {:?}, but got {:?}",
             KeyType::P256,
             signer_bytes.key_type(),
         );
-        let signer_byte_v = signer_bytes.extract_raw_bytes()?;
-        Ok(p256::ecdsa::SigningKey::from_slice(signer_byte_v.as_ref())?)
+        Ok(p256::ecdsa::SigningKey::from_slice(signer_bytes.bytes())?)
     }
 }
 

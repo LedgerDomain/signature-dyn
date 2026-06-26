@@ -1,6 +1,6 @@
 [package]
 name = "signature-dyn"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 
 [features]
@@ -13,7 +13,7 @@ p384 = ["dep:p384", "dep:signature"]
 p521 = ["dep:p521", "dep:signature"]
 pkcs8 = ["ed25519-dalek?/pem", "dep:pkcs8"]
 random = ["ed25519-dalek?/rand_core", "dep:rand"]
-serde = ["dep:serde"]
+serde = ["dep:serde", "zeroize/serde"]
 signature = ["dep:signature"]
 ssi-multicodec = ["dep:ssi-multicodec"]
 

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::{
     AsyncSignerT, ExtractableSignerT, KeyType, Result, SignatureT, SignerBytes, VerifierBytes,
     VerifierT,
@@ -15,25 +13,15 @@ use crate::{
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait AsyncExtractableSignerT: AsyncSignerT {
-    /// Return the raw byte representation of this AsyncExtractableSignerT.
-    async fn async_extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>>;
-    /// Returns the SignerBytes representation of this AsyncExtractableSignerT, which is useful for interoperability.
-    async fn async_extract_signer_bytes<'b, 's: 'b>(&'s self) -> Result<SignerBytes<'b>> {
-        Ok(SignerBytes::new(
-            self.async_key_type().await?,
-            self.async_extract_raw_bytes().await?,
-        )?)
-    }
+    /// Returns the SignerBytes representation of this AsyncExtractableSignerT.
+    async fn async_extract_signer_bytes(&self) -> Result<SignerBytes>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<S: AsyncSignerT + ExtractableSignerT + Send + Sync> AsyncExtractableSignerT for S {
-    async fn async_extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
-        Ok(self.extract_raw_bytes()?)
-    }
-    async fn async_extract_signer_bytes<'b, 's: 'b>(&'s self) -> Result<SignerBytes<'b>> {
-        Ok(self.extract_signer_bytes()?)
+    async fn async_extract_signer_bytes(&self) -> Result<SignerBytes> {
+        self.extract_signer_bytes()
     }
 }
 
@@ -69,10 +57,7 @@ impl<'a> AsyncSignerT for AsAsyncExtractableSigner<'a> {
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<'a> AsyncExtractableSignerT for AsAsyncExtractableSigner<'a> {
-    async fn async_extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
-        Ok(self.0.extract_raw_bytes()?)
-    }
-    async fn async_extract_signer_bytes<'b, 's: 'b>(&'s self) -> Result<SignerBytes<'b>> {
-        Ok(self.0.extract_signer_bytes()?)
+    async fn async_extract_signer_bytes(&self) -> Result<SignerBytes> {
+        self.0.extract_signer_bytes()
     }
 }

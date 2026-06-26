@@ -39,8 +39,8 @@ impl TryFrom<&SignatureBytes<'_>> for ed448_goldilocks::Signature {
 //
 
 impl ExtractableSignerT for ed448_goldilocks::SigningKey {
-    fn extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
-        Ok(self.as_bytes().as_slice().into())
+    fn extract_signer_bytes(&self) -> Result<SignerBytes> {
+        SignerBytes::new(KeyType::Ed448, self.as_bytes().as_slice().to_vec().into())
     }
 }
 
@@ -88,17 +88,16 @@ impl SignerT for ed448_goldilocks::SigningKey {
     }
 }
 
-impl TryFrom<&SignerBytes<'_>> for ed448_goldilocks::SigningKey {
+impl TryFrom<&SignerBytes> for ed448_goldilocks::SigningKey {
     type Error = crate::Error;
-    fn try_from(signer_bytes: &SignerBytes<'_>) -> Result<Self> {
+    fn try_from(signer_bytes: &SignerBytes) -> Result<Self> {
         ensure!(
             signer_bytes.key_type() == KeyType::Ed448,
             "expected key type to be {:?}, but got {:?}",
             KeyType::Ed448,
             signer_bytes.key_type(),
         );
-        let signer_byte_v = signer_bytes.bytes();
-        ed448_goldilocks::SigningKey::try_from(signer_byte_v.as_ref())
+        ed448_goldilocks::SigningKey::try_from(signer_bytes.bytes())
             .map_err(|e| error!("failed to convert SignerBytes to SigningKey: {}", e))
     }
 }

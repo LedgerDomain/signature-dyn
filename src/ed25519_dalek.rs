@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use zeroize::Zeroizing;
+
 use crate::{
     ExtractableSignerT, KeyType, Result, SignatureBytes, SignatureT, SignerBytes, SignerT,
     VerifierBytes, VerifierT, ensure, error,
@@ -41,8 +43,11 @@ impl TryFrom<&SignatureBytes<'_>> for ed25519_dalek::Signature {
 //
 
 impl ExtractableSignerT for ed25519_dalek::SigningKey {
-    fn extract_raw_bytes<'b, 's: 'b>(&'s self) -> Result<Cow<'b, [u8]>> {
-        Ok(self.as_bytes().as_slice().into())
+    fn extract_signer_bytes(&self) -> Result<SignerBytes> {
+        SignerBytes::new(
+            KeyType::Ed25519,
+            Zeroizing::new(self.as_bytes().as_slice().to_vec()),
+        )
     }
 }
 
@@ -89,17 +94,16 @@ impl SignerT for ed25519_dalek::SigningKey {
     }
 }
 
-impl TryFrom<&SignerBytes<'_>> for ed25519_dalek::SigningKey {
+impl TryFrom<&SignerBytes> for ed25519_dalek::SigningKey {
     type Error = crate::Error;
-    fn try_from(signer_bytes: &SignerBytes<'_>) -> Result<Self> {
+    fn try_from(signer_bytes: &SignerBytes) -> Result<Self> {
         ensure!(
             signer_bytes.key_type() == KeyType::Ed25519,
             "expected key type to be {:?}, but got {:?}",
             KeyType::Ed25519,
             signer_bytes.key_type(),
         );
-        let signer_byte_v = signer_bytes.bytes();
-        let byte_array = <&[u8; 32]>::try_from(signer_byte_v.as_ref())?;
+        let byte_array = <&[u8; 32]>::try_from(signer_bytes.bytes())?;
         Ok(ed25519_dalek::SigningKey::from_bytes(byte_array))
     }
 }
